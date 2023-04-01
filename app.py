@@ -4,7 +4,9 @@ from werkzeug.utils import secure_filename
 import uuid
 import command
 from detect import detect as modelDetect
+from flask_cors import CORS
 app = Flask(__name__)
+CORS(app)
 
 
 @app.route("/")
