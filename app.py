@@ -2,7 +2,8 @@ from flask import Flask, request, send_file, url_for
 from markupsafe import escape
 from werkzeug.utils import secure_filename
 import uuid
-
+import command
+from detect import detect as modelDetect
 app = Flask(__name__)
 
 
@@ -17,7 +18,8 @@ def index():
 def detect():
     file = request.files['image']
     filename = f"{str(uuid.uuid4())}{secure_filename(file.filename)}"
-    file.save(f"storage/{filename}")
+    file.save(f"storage/upload/{filename}")
+    modelDetect(f"storage/upload/{filename}")
     return {
         "success": True,
         "message": "Gambar berhasil dideteksi",
@@ -31,4 +33,4 @@ def detect():
 
 @ app.get("/result/<filename>")
 def result(filename):
-    return send_file(f"storage/{secure_filename(filename)}")
+    return send_file(f"storage/result/{secure_filename(filename)}")
