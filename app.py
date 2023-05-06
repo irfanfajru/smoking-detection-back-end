@@ -11,7 +11,7 @@ CORS(app)
 
 @app.route("/")
 def index():
-    return "<p>Hello Dek, mau ngapain ?</p>"
+    return "<p>Hello World :)</p>"
 
 # post detection image
 
@@ -21,7 +21,9 @@ def detect():
     file = request.files['image']
     filename = f"{str(uuid.uuid4())}{secure_filename(file.filename)}"
     file.save(f"storage/upload/{filename}")
-    modelDetect(f"storage/upload/{filename}")
+    # detection
+    modelDetect(f"storage/upload/{filename}",
+                weights=["weights/yolov7cigar.pt"])
     return {
         "success": True,
         "message": "Gambar berhasil dideteksi",
