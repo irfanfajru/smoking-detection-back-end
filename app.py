@@ -2,7 +2,6 @@ from flask import Flask, request, send_file, url_for
 from markupsafe import escape
 from werkzeug.utils import secure_filename
 import uuid
-import command
 from detect import detect as modelDetect
 from flask_cors import CORS
 app = Flask(__name__)
@@ -23,7 +22,7 @@ def detect():
     file.save(f"storage/upload/{filename}")
     # detection
     modelDetect(f"storage/upload/{filename}",
-                weights=["weights/yolov7cigar.pt"])
+                weights=["weights/yolov7custom.pt"])
     return {
         "success": True,
         "message": "Gambar berhasil dideteksi",
