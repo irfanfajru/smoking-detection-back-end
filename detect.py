@@ -15,7 +15,7 @@ from utils.plots import plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized, TracedModel
 
 
-def detect(inputImage, classes=None, threshold=0.25, saveDir="storage/result", weights=["weights/yolov7.pt"], imageSize=416, save_img=True):
+def detect(inputImage, classes=None, threshold=0.25, saveDir="storage/result", weights=["weights/yolov7.pt"], imageSize=640, save_img=True):
     source, weights, view_img, save_txt, imgsz, trace = inputImage, weights, False, False, imageSize, False
     # Directories
     save_dir = Path(saveDir)
