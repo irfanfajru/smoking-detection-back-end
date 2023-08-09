@@ -1,23 +1,20 @@
 import argparse
 import time
 from pathlib import Path
-import os
+
 import cv2
 import torch
 import torch.backends.cudnn as cudnn
 from numpy import random
-import numpy as np
+
 from models.experimental import attempt_load
 from utils.datasets import LoadStreams, LoadImages
 from utils.general import check_img_size, check_requirements, check_imshow, non_max_suppression, apply_classifier, \
     scale_coords, xyxy2xywh, strip_optimizer, set_logging, increment_path
 from utils.plots import plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized, TracedModel
-import uuid
-# second model
-from detect_cigar import detect_cigar
 
-def detect(inputImage, classes=None, threshold=0.25, saveDir="storage/result", weights=["weights/yolov7.pt"], imageSize=640, save_img=True):
+def detect_cigar(inputImage, classes=None, threshold=0.5, saveDir="storage/result", weights=["weights/best_cigarette.pt"], imageSize=640, save_img=False):
     source, weights, view_img, save_txt, imgsz, trace = inputImage, weights, False, False, imageSize, False
     # Directories
     save_dir = Path(saveDir)
@@ -30,6 +27,9 @@ def detect(inputImage, classes=None, threshold=0.25, saveDir="storage/result", w
     model = attempt_load(weights, map_location=device)  # load FP32 model
     stride = int(model.stride.max())  # model stride
     imgsz = check_img_size(imgsz, s=stride)  # check img_size
+
+    if trace:
+        model = TracedModel(model, device, imageSize)
 
     if half:
         model.half()  # to FP16
@@ -87,6 +87,12 @@ def detect(inputImage, classes=None, threshold=0.25, saveDir="storage/result", w
             pred = apply_classifier(pred, modelc, img, im0s)
 
         # Process detections
+        result = dict({
+            "merokok":False,
+            "boxes":[],
+            "score":0,
+        })
+
         for i, det in enumerate(pred):  # detections per image
             p, s, im0, frame = path, '', im0s, getattr(dataset, 'frame', 0)
 
@@ -109,60 +115,58 @@ def detect(inputImage, classes=None, threshold=0.25, saveDir="storage/result", w
 
                 # Write results
                 for *xyxy, conf, cls in reversed(det):
-                    # detect cigar from second model
-                    cropImagePath,cropImage = imcrop(im0,map(int, xyxy))
-                    result = detect_cigar(cropImagePath,weights=["weights/best_cigarette.pt"],imageSize=640)
-                    if result["merokok"]:
-                        for resBox in result['boxes']:
-                            plot_one_box(resBox['box'], cropImage, label=f'{resBox["cls"]} {resBox["conf"]:.2f}',
-                                            color=[0,0,244], line_thickness=1)
-                        
-                        # combine bbox
-                        im0 = combine_img(im0,cropImage,map(int,xyxy))
-                        label = f'Merokok {result["score"]:.2f}'
+
+                    result['merokok'] = True
+                    result['boxes'].append({
+                        "cls" : names[int(cls)],
+                        "conf": conf,
+                        "box": xyxy,
+                    })
+                    result['score'] += conf
+
+                    if save_txt:  # Write to file
+                        xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)
+                                          ) / gn).view(-1).tolist()  # normalized xywh
+                        # label format
+                        line = (
+                            cls, *xywh, conf) if threshold else (cls, *xywh)
+                        with open(txt_path + '.txt', 'a') as f:
+                            f.write(('%g ' * len(line)).rstrip() % line + '\n')
+
+                    if save_img or view_img:  # Add bbox to image
+                        label = f'{names[int(cls)]} {conf:.2f}'
                         plot_one_box(xyxy, im0, label=label,
-                                    color=[0,0,244], line_thickness=2)
-                        
-                    # delete temp file
-                    os.remove(cropImagePath)
-
-
+                                     color=colors[int(cls)], line_thickness=1)
+                result['score'] = result['score']/len(det)
             # Print time (inference + NMS)
             print(
                 f'{s}Done. ({(1E3 * (t2 - t1)):.1f}ms) Inference, ({(1E3 * (t3 - t2)):.1f}ms) NMS')
 
             # Save results (image with detections)
             if save_img:
-                cv2.imwrite(save_path, im0)
-                print(
-                    f" The image with the result is saved in: {save_path}")
+                if dataset.mode == 'image':
+                    cv2.imwrite(save_path, im0)
+                    print(
+                        f" The image with the result is saved in: {save_path}")
+                else:  # 'video' or 'stream'
+                    if vid_path != save_path:  # new video
+                        vid_path = save_path
+                        if isinstance(vid_writer, cv2.VideoWriter):
+                            vid_writer.release()  # release previous video writer
+                        if vid_cap:  # video
+                            fps = vid_cap.get(cv2.CAP_PROP_FPS)
+                            w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                            h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                        else:  # stream
+                            fps, w, h = 30, im0.shape[1], im0.shape[0]
+                            save_path += '.mp4'
+                        vid_writer = cv2.VideoWriter(
+                            save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
+                    vid_writer.write(im0)
 
     if save_txt or save_img:
         s = f"\n{len(list(save_dir.glob('labels/*.txt')))} labels saved to {save_dir / 'labels'}" if save_txt else ''
         # print(f"Results saved to {save_dir}{s}")
 
     print(f'Done. ({time.time() - t0:.3f}s)')
-
-def imcrop(img, bbox): 
-    x1,y1,x2,y2 = bbox
-    if x1 < 0 or y1 < 0 or x2 > img.shape[1] or y2 > img.shape[0]:
-        img, x1, x2, y1, y2 = pad_img_to_fit_bbox(img, x1, x2, y1, y2)
-    cropedImg = img[y1:y2, x1:x2, :]
-    # temp crop image
-    path = f"storage/temp/{uuid.uuid4()}.jpg"
-    cv2.imwrite(path,cropedImg)
-    return path,cropedImg
-
-def pad_img_to_fit_bbox(img, x1, x2, y1, y2):
-    img = np.pad(img, ((np.abs(np.minimum(0, y1)), np.maximum(y2 - img.shape[0], 0)),
-               (np.abs(np.minimum(0, x1)), np.maximum(x2 - img.shape[1], 0)), (0,0)), mode="constant")
-    y1 += np.abs(np.minimum(0, y1))
-    y2 += np.abs(np.minimum(0, y1))
-    x1 += np.abs(np.minimum(0, x1))
-    x2 += np.abs(np.minimum(0, x1))
-    return img, x1, x2, y1, y2
-
-def combine_img(img,cropedImg,bbox):
-    x1,y1,x2,y2 = bbox
-    img[y1:y2, x1:x2, :] = cropedImg
-    return img
+    return result

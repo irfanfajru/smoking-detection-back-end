@@ -3,6 +3,7 @@ from markupsafe import escape
 from werkzeug.utils import secure_filename
 import uuid
 from detect import detect as modelDetect
+from detect_multi_model import detect_multi_model
 from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
@@ -26,10 +27,13 @@ def detect():
     #             weights=["weights/yolov7custom.pt"])
     
     # detection for yolov7 ms coco weight
-    # only for person and motorcycle classes
+    # only for person class
     modelDetect(f"storage/upload/{filename}",
-                classes=[0,3],
+                classes=[0],
                 weights=["weights/yolov7.pt"])
+
+    # detect multi model weight
+    # detect_multi_model(filename)
 
     return {
         "success": True,
