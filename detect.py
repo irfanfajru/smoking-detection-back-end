@@ -14,7 +14,6 @@ from utils.general import check_img_size, check_requirements, check_imshow, non_
 from utils.plots import plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized, TracedModel
 
-
 def detect(inputImage, classes=None, threshold=0.25, saveDir="storage/result", weights=["weights/yolov7.pt"], imageSize=640, save_img=True):
     source, weights, view_img, save_txt, imgsz, trace = inputImage, weights, False, False, imageSize, False
     # Directories
@@ -109,7 +108,23 @@ def detect(inputImage, classes=None, threshold=0.25, saveDir="storage/result", w
                     s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "
 
                 # Write results
+                biker = dict()
+                counter = 0
                 for *xyxy, conf, cls in reversed(det):
+                    counter+=1
+                    # experiment iou
+                    for *xyxyt, conft,clst in reversed(det):
+                        iou = bbox_iou(xyxy,xyxyt)
+                        if iou == 1.0 or iou == 0.0:
+                            continue
+
+                        if cls != clst and (iou['iou'] >0.1 and iou['iou']<0.9):
+                            biker[counter] = iou
+                            plot_one_box(iou["box"],im0,label="biker",
+                                      color=colors[int(cls)], line_thickness=2)
+                        # print(iou)
+                        print(f"({names[int(cls)]}, {conf}) with ({names[int(clst)]}, {conft}) iou = {iou['iou']}")
+                    
                     if save_txt:  # Write to file
                         xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)
                                           ) / gn).view(-1).tolist()  # normalized xywh
@@ -155,3 +170,39 @@ def detect(inputImage, classes=None, threshold=0.25, saveDir="storage/result", w
         # print(f"Results saved to {save_dir}{s}")
 
     print(f'Done. ({time.time() - t0:.3f}s)')
+
+
+# iou func
+def bbox_iou(box1, box2, x1y1x2y2=True, eps=1e-7):
+    # Returns the IoU of box1 to box2. box1 is 4, box2 is 4
+
+    # Get the coordinates of bounding boxes
+    if x1y1x2y2:  # x1, y1, x2, y2 = box1
+        b1_x1, b1_y1, b1_x2, b1_y2 = box1[0], box1[1], box1[2], box1[3]
+        b2_x1, b2_y1, b2_x2, b2_y2 = box2[0], box2[1], box2[2], box2[3]
+    else:  # transform from xywh to xyxy
+        b1_x1, b1_x2 = box1[0] - box1[2] / 2, box1[0] + box1[2] / 2
+        b1_y1, b1_y2 = box1[1] - box1[3] / 2, box1[1] + box1[3] / 2
+        b2_x1, b2_x2 = box2[0] - box2[2] / 2, box2[0] + box2[2] / 2
+        b2_y1, b2_y2 = box2[1] - box2[3] / 2, box2[1] + box2[3] / 2
+
+    # Intersection area
+    inter = (torch.min(b1_x2, b2_x2) - torch.max(b1_x1, b2_x1)).clamp(0) * \
+            (torch.min(b1_y2, b2_y2) - torch.max(b1_y1, b2_y1)).clamp(0)
+
+    # Union Area
+    w1, h1 = b1_x2 - b1_x1, b1_y2 - b1_y1 + eps
+    w2, h2 = b2_x2 - b2_x1, b2_y2 - b2_y1 + eps
+    union = w1 * h1 + w2 * h2 - inter + eps
+
+    iou = inter / union
+    return {
+        "iou":iou.item(),
+        "box":merge_boxes(box1,box2)
+        }  # IoU
+
+def merge_boxes(box1, box2):
+    return [min(box1[0], box2[0]), 
+         min(box1[1], box2[1]), 
+         max(box1[2], box2[2]),
+         max(box1[3], box2[3])]

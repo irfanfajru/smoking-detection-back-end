@@ -20,9 +20,17 @@ def detect():
     file = request.files['image']
     filename = f"{str(uuid.uuid4())}{secure_filename(file.filename)}"
     file.save(f"storage/upload/{filename}")
-    # detection
+    # inference
+    # detection for custom weight
+    # modelDetect(f"storage/upload/{filename}",
+    #             weights=["weights/yolov7custom.pt"])
+    
+    # detection for yolov7 ms coco weight
+    # only for person and motorcycle classes
     modelDetect(f"storage/upload/{filename}",
-                weights=["weights/yolov7custom.pt"])
+                classes=[0,3],
+                weights=["weights/yolov7.pt"])
+
     return {
         "success": True,
         "message": "Gambar berhasil dideteksi",
