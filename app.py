@@ -27,7 +27,7 @@ def detect():
     # inference 2 using cig_81 weight
     # to detect cigar from frame (person and motorcycle)
     resultDetection = modelDetect(f"storage/upload/{filename}",
-                                    classes=[0,2],
+                                    classes=[0,3],
                                     weights=["weights/yolov7.pt","weights/best_cigarette.pt"])
 
     return {
