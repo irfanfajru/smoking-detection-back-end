@@ -21,25 +21,21 @@ def detect():
     file = request.files['image']
     filename = f"{str(uuid.uuid4())}{secure_filename(file.filename)}"
     file.save(f"storage/upload/{filename}")
-    # inference
-    # detection for custom weight
-    # modelDetect(f"storage/upload/{filename}",
-    #             weights=["weights/yolov7custom.pt"])
-    
+    # inference 1
     # detection for yolov7 ms coco weight
-    # only for person class
-    modelDetect(f"storage/upload/{filename}",
-                classes=[0],
-                weights=["weights/yolov7.pt"])
-
-    # detect multi model weight
-    # detect_multi_model(filename)
+    # only for person and motorcycle class
+    # inference 2 using cig_81 weight
+    # to detect cigar from frame (person and motorcycle)
+    resultDetection = modelDetect(f"storage/upload/{filename}",
+                                    classes=[0,2],
+                                    weights=["weights/yolov7.pt","weights/best_cigarette.pt"])
 
     return {
         "success": True,
         "message": "Gambar berhasil dideteksi",
         "data": {
             "resultUrl": url_for("result", filename=filename, _external=True),
+            "detailDetection":resultDetection
         }
     }
 

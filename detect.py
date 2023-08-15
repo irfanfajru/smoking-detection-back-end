@@ -27,7 +27,7 @@ def detect(inputImage, classes=None, threshold=0.25, saveDir="storage/result", w
     half = device.type != 'cpu'  # half precision only supported on CUDA
 
     # Load model
-    model = attempt_load(weights, map_location=device)  # load FP32 model
+    model = attempt_load(weights[0], map_location=device)  # load FP32 model
     stride = int(model.stride.max())  # model stride
     imgsz = check_img_size(imgsz, s=stride)  # check img_size
 
@@ -46,7 +46,7 @@ def detect(inputImage, classes=None, threshold=0.25, saveDir="storage/result", w
 
     # Get names and colors
     names = model.module.names if hasattr(model, 'module') else model.names
-    colors = [[random.randint(0, 255) for _ in range(3)] for _ in names]
+    # colors = [[random.randint(0, 255) for _ in range(3)] for _ in names]
 
     # Run inference
     if device.type != 'cpu':
@@ -108,24 +108,38 @@ def detect(inputImage, classes=None, threshold=0.25, saveDir="storage/result", w
                     s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "
 
                 # Write results
+                detailDetection = []
                 for *xyxy, conf, cls in reversed(det):
                     # detect cigar from second model
                     cropImagePath,cropImage = imcrop(im0,map(int, xyxy))
-                    result = detect_cigar(cropImagePath,weights=["weights/best_cigarette.pt"],imageSize=640)
+                    result = detect_cigar(cropImagePath,weights=[weights[1]],imageSize=640)
                     if result["merokok"]:
+                        # write bbox for person and detect cigar
+                        tempDetail = []
                         for resBox in result['boxes']:
+                            tempDetail.append({
+                                "cls":resBox['cls'],
+                                'conf':f"{resBox['conf']:.2f}"
+                            })
                             plot_one_box(resBox['box'], cropImage, label=f'{resBox["cls"]} {resBox["conf"]:.2f}',
                                             color=[0,0,244], line_thickness=1)
                         
-                        # combine bbox
+                        # combine bbox from croped img to im0
                         im0 = combine_img(im0,cropImage,map(int,xyxy))
+                        # create bbox for person who smoking
                         label = f'Merokok {result["score"]:.2f}'
                         plot_one_box(xyxy, im0, label=label,
                                     color=[0,0,244], line_thickness=2)
                         
+                        # add detail detection
+                        detailDetection.append({
+                            "label":label,
+                            "conf":f"{result['score']:.2f}",
+                            "detail":tempDetail,
+                        })
+
                     # delete temp file
                     os.remove(cropImagePath)
-
 
             # Print time (inference + NMS)
             print(
@@ -142,6 +156,8 @@ def detect(inputImage, classes=None, threshold=0.25, saveDir="storage/result", w
         # print(f"Results saved to {save_dir}{s}")
 
     print(f'Done. ({time.time() - t0:.3f}s)')
+    print(detailDetection)
+    return detailDetection
 
 def imcrop(img, bbox): 
     x1,y1,x2,y2 = bbox
@@ -166,3 +182,29 @@ def combine_img(img,cropedImg,bbox):
     x1,y1,x2,y2 = bbox
     img[y1:y2, x1:x2, :] = cropedImg
     return img
+
+def bbox_iou(box1, box2, x1y1x2y2=True,eps=1e-7):
+    # Returns the IoU of box1 to box2. box1 is 4, box2 is nx4
+    box2 = box2.T
+
+    # Get the coordinates of bounding boxes
+    if x1y1x2y2:  # x1, y1, x2, y2 = box1
+        b1_x1, b1_y1, b1_x2, b1_y2 = box1[0], box1[1], box1[2], box1[3]
+        b2_x1, b2_y1, b2_x2, b2_y2 = box2[0], box2[1], box2[2], box2[3]
+    else:  # transform from xywh to xyxy
+        b1_x1, b1_x2 = box1[0] - box1[2] / 2, box1[0] + box1[2] / 2
+        b1_y1, b1_y2 = box1[1] - box1[3] / 2, box1[1] + box1[3] / 2
+        b2_x1, b2_x2 = box2[0] - box2[2] / 2, box2[0] + box2[2] / 2
+        b2_y1, b2_y2 = box2[1] - box2[3] / 2, box2[1] + box2[3] / 2
+
+    # Intersection area
+    inter = (torch.min(b1_x2, b2_x2) - torch.max(b1_x1, b2_x1)).clamp(0) * \
+            (torch.min(b1_y2, b2_y2) - torch.max(b1_y1, b2_y1)).clamp(0)
+
+    # Union Area
+    w1, h1 = b1_x2 - b1_x1, b1_y2 - b1_y1 + eps
+    w2, h2 = b2_x2 - b2_x1, b2_y2 - b2_y1 + eps
+    union = w1 * h1 + w2 * h2 - inter + eps
+
+    iou = inter / union
+    return iou  # IoU
