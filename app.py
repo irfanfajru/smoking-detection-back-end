@@ -5,6 +5,7 @@ import uuid
 from detect import detect as modelDetect
 from detect_multi_model import detect_multi_model
 from flask_cors import CORS
+import urllib.request
 app = Flask(__name__)
 CORS(app)
 
@@ -14,8 +15,6 @@ def index():
     return "<p>Hello World :)</p>"
 
 # post detection image
-
-
 @app.post("/detect")
 def detect():
     file = request.files['image']
@@ -39,9 +38,37 @@ def detect():
         }
     }
 
+# post example request
+@app.post("/example")
+def example():
+    data = request.get_json()
+    filename = str(uuid.uuid4())+(data['file_url'].split("/"))[-1]
+    try:
+        urllib.request.urlretrieve(data['file_url'],f"./storage/upload/{filename}")
+        print(f"Downloaded '{filename}' from '{data['file_url']}'")
+        resultDetection = modelDetect(f"storage/upload/{filename}",
+                                    classes=[0,3],
+                                    weights=["weights/yolov7.pt","weights/best_cigarette.pt"])
+
+        return {
+            "success": True,
+            "message": "Gambar berhasil dideteksi",
+            "data": {
+                "resultUrl": url_for("result", filename=filename, _external=True),
+                "detailDetection":resultDetection
+            }
+        }
+
+    except Exception as e:
+        print(f"Failed to download '{filename}' from '{data['file_url']}': {e}")
+        return {
+            "success":False,
+            "message":"Failed",
+            "data":None,
+        }
+    
+
 # get result
-
-
 @ app.get("/result/<filename>")
 def result(filename):
     return send_file(f"storage/result/{secure_filename(filename)}")
