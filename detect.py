@@ -109,7 +109,9 @@ def detect(inputImage, classes=None, threshold=0.25, saveDir="storage/result", w
 
                 # Write results
                 detailDetection = []
+                idx = 0
                 for rider in find_riders(reversed(det)):
+                    idx+=1
                     # detect cigar from second model
                     cropImagePath,cropImage = imcrop(im0,map(int, rider["personBox"]))
                     result = detect_cigar(cropImagePath,weights=[weights[1]],imageSize=640)
@@ -122,18 +124,18 @@ def detect(inputImage, classes=None, threshold=0.25, saveDir="storage/result", w
                                 'conf':f"{resBox['conf']:.2f}"
                             })
                             plot_one_box(resBox['box'], cropImage, label=f'{resBox["cls"]} {resBox["conf"]:.2f}',
-                                            color=[0,0,220], line_thickness=1)
+                                            color=[0,0,220], line_thickness=2)
                         
                         # combine bbox from croped img to im0
                         im0 = combine_img(im0,cropImage,map(int,rider["personBox"]))
                         # create bbox for person who smoking
-                        label = f'Merokok'
+                        label = f'{idx}. Merokok'
                         plot_one_box(rider["combinedBox"], im0, label=label,
-                                    color=[0,0,220], line_thickness=2)
+                                    color=[0,0,220], line_thickness=3)
                     else:
-                        label = "Tidak Merokok"
+                        label = f"{idx}. Tidak Merokok"
                         plot_one_box(rider["combinedBox"], im0, label=label,
-                                    color=[0,100,0], line_thickness=2)
+                                    color=[0,100,0], line_thickness=3)
 
                     # add detail detection
                     detailDetection.append({
@@ -233,22 +235,22 @@ def check_overlap(person_bbox, motorcycle_bbox):
 def find_riders(det):
     riders = []
     combined = set()
-    det1 = 0
+    person = 0
     for *xyxy, _, cls in reversed(det):
-        det2 = 0
+        motorcycle = 0
         for *xyxy2, _, cls2 in reversed(det):
-            if (int(cls) == 0 and int(cls2) == 3) and (det1 not in combined and det2 not in combined):
+            if (int(cls) == 0 and int(cls2) == 3) and (person not in combined and motorcycle not in combined):
                 iou,combinedBox = bbox_iou(xyxy,xyxy2)
-                if (iou >= 0.5 or iou <= 0.7) and check_overlap(xyxy,xyxy2):
+                if iou >= 0.2 and check_overlap(xyxy,xyxy2):
                     riders.append({
                         "combinedBox":combinedBox,
                         "personBox":xyxy,
                         "motorcycleBox":xyxy2,
                     })
-                    combined.add(det1)
-                    combined.add(det2)
-            det2+=1
-        det1+=1
+                    combined.add(person)
+                    combined.add(motorcycle)
+            motorcycle+=1
+        person+=1
     print(combined)
     return riders
 

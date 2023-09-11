@@ -14,7 +14,7 @@ from utils.general import check_img_size, check_requirements, check_imshow, non_
 from utils.plots import plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized, TracedModel
 
-def detect_cigar(inputImage, classes=None, threshold=0.25, saveDir="storage/result", weights=["weights/best_cigarette.pt"], imageSize=640, save_img=False):
+def detect_cigar(inputImage, classes=None, threshold=0.5, saveDir="storage/result", weights=["weights/best_cigarette.pt"], imageSize=640, save_img=False):
     source, weights, view_img, save_txt, imgsz, trace = inputImage, weights, False, False, imageSize, False
     # Directories
     save_dir = Path(saveDir)

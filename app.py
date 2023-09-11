@@ -26,17 +26,22 @@ def detect():
     # inference 2 using cig_81 weight
     # to detect cigar from frame (person and motorcycle)
     resultDetection = modelDetect(f"storage/upload/{filename}",
-                                    classes=[0,3],
-                                    weights=["weights/yolov7.pt","weights/best_cigarette.pt"])
+                                  classes=[0, 3],
+                                  weights=["weights/yolov7.pt", "weights/best_cigar.pt"])
 
     return {
         "success": True,
         "message": "Gambar berhasil dideteksi",
         "data": {
             "resultUrl": url_for("result", filename=filename, _external=True),
-            "detailDetection":resultDetection
+            "detailDetection": resultDetection
         }
     }
+
+# get result
+@ app.get("/result/<filename>")
+def result(filename):
+    return send_file(f"storage/result/{secure_filename(filename)}")
 
 # post example request
 @app.post("/example")
@@ -44,31 +49,27 @@ def example():
     data = request.get_json()
     filename = str(uuid.uuid4())+(data['file_url'].split("/"))[-1]
     try:
-        urllib.request.urlretrieve(data['file_url'],f"./storage/upload/{filename}")
+        urllib.request.urlretrieve(
+            data['file_url'], f"./storage/upload/{filename}")
         print(f"Downloaded '{filename}' from '{data['file_url']}'")
         resultDetection = modelDetect(f"storage/upload/{filename}",
-                                    classes=[0,3],
-                                    weights=["weights/yolov7.pt","weights/best_cigarette.pt"])
+                                      classes=[0, 3],
+                                      weights=["weights/yolov7.pt", "weights/best_cigar.pt"])
 
         return {
             "success": True,
             "message": "Gambar berhasil dideteksi",
             "data": {
                 "resultUrl": url_for("result", filename=filename, _external=True),
-                "detailDetection":resultDetection
+                "detailDetection": resultDetection
             }
         }
 
     except Exception as e:
-        print(f"Failed to download '{filename}' from '{data['file_url']}': {e}")
+        print(
+            f"Failed to download '{filename}' from '{data['file_url']}': {e}")
         return {
-            "success":False,
-            "message":"Failed",
-            "data":None,
+            "success": False,
+            "message": "Failed",
+            "data": None,
         }
-    
-
-# get result
-@ app.get("/result/<filename>")
-def result(filename):
-    return send_file(f"storage/result/{secure_filename(filename)}")
