@@ -3,7 +3,6 @@ from markupsafe import escape
 from werkzeug.utils import secure_filename
 import uuid
 from detect import detect as modelDetect
-from detect_multi_model import detect_multi_model
 from flask_cors import CORS
 import urllib.request
 app = Flask(__name__)
